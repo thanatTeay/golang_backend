@@ -3,7 +3,6 @@ package repository
 import (
 	"context"
 	"errors"
-	"fmt"
 	"golangBackend/db"
 	"golangBackend/form"
 	"golangBackend/models"
@@ -25,6 +24,7 @@ type usersEntity struct {
 type UserDetails interface {
 	Register(userForm form.Users) (*models.Users, int, error)
 	GetUserByID(username string) (*models.Users, int, error)
+	OnlineUsers() ([]models.Users, int, error)
 	GetAll() ([]models.Users, int, error)
 }
 
@@ -33,6 +33,27 @@ func NewUserEntity(resource *db.Resource) UserDetails {
 	UserEntity = &usersEntity{resource: resource, repo: userRepo}
 
 	return UserEntity
+}
+
+func (entity *usersEntity) OnlineUsers() ([]models.Users, int, error) {
+	usersList := []models.Users{}
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+	cursor, err := entity.repo.Find(ctx, bson.M{"online": true})
+	if err != nil {
+		logrus.Print(err)
+		return []models.Users{}, 400, err
+	}
+	for cursor.Next(ctx) {
+		var user models.Users
+		err = cursor.Decode(&user)
+		if err != nil {
+			logrus.Print(err)
+		}
+		usersList = append(usersList, user)
+	}
+	return usersList, http.StatusOK, nil
+
 }
 
 func (entity *usersEntity) GetUserByID(username string) (*models.Users, int, error) {
@@ -53,21 +74,24 @@ func (entity *usersEntity) GetUserByID(username string) (*models.Users, int, err
 func (entity *usersEntity) Register(userForm form.Users) (*models.Users, int, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
-	fmt.Printf("%+s\n", userForm.Username)
+	//fmt.Printf("%+s\n", userForm.Username)
 	user := models.Users{
 		Username: userForm.Username,
 		Online:   false,
 	}
 	//log.Fatal(userForm.Username)
 	found, _, _ := entity.GetUserByID(user.Username)
+	//fmt.Printf("Username for getID: %+s\n", user.Username)
 	if found != nil {
 		return nil, http.StatusBadRequest, errors.New("Username is already used")
 	}
 	_, err := entity.repo.InsertOne(ctx, user)
+
 	if err != nil {
 		logrus.Print(err)
 		return nil, 400, err
 	}
+
 	return &user, http.StatusOK, nil
 }
 
