@@ -21,6 +21,30 @@ func ApplyUserAPI(app *gin.RouterGroup, resource *db.Resource) {
 	authRouteUser.GET("/getall", GetAllUsers(userEntity))
 	authRouteUser.GET("/getonline", GetOnlineUsers(userEntity))
 
+	authRouteChallenge := app.Group("/challenge")
+	authRouteChallenge.POST("/fighting", challenging(userEntity))
+
+}
+
+func challenging(userEntity repository.UserDetails) func(ctx *gin.Context) {
+	return func(ctx *gin.Context) {
+		var cRequest form.Challenge
+
+		err := ctx.BindJSON(&cRequest)
+		if err != nil {
+			ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"err": err.Error()})
+			return
+		}
+		challenger, code, err := userEntity.Challenging(cRequest)
+		//history, code, err := userEntity.History(cRequest)
+		//fmt.Printf("%+v\n", challenger)
+		response := map[string]interface{}{
+			"data": challenger,
+			//"error":    err.Error(),
+		}
+		ctx.JSON(code, response)
+
+	}
 }
 
 func signUp(userEntity repository.UserDetails) func(ctx *gin.Context) {
