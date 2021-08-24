@@ -16,17 +16,19 @@ func ApplyUserAPI(app *gin.RouterGroup, resource *db.Resource) {
 	fmt.Printf("%+v\n", authRoute)
 	//authRoute.POST("/login", login(userEntity))
 	authRoute.POST("/signup", signUp(userEntity))
+
 	//fmt.Printf("CheckSignUpReturn:  %+v\n", signUp(userEntity))
 	authRouteUser := app.Group("/users")
 	authRouteUser.GET("/getall", GetAllUsers(userEntity))
 	authRouteUser.GET("/getonline", GetOnlineUsers(userEntity))
+	authRoute.POST("/updateStatus", UpdateStatusUser(userEntity))
 
-	authRouteChallenge := app.Group("/challenge")
-	authRouteChallenge.POST("/fighting", challenging(userEntity))
+	//authRouteChallenge := app.Group("/challenge")
+	//authRouteChallenge.POST("/fighting", Challenge(userEntity))
 
 }
 
-func challenging(userEntity repository.UserDetails) func(ctx *gin.Context) {
+/*func Challenge(usersEntity repository.UserDetails) func(ctx *gin.Context) {
 	return func(ctx *gin.Context) {
 		var cRequest form.Challenge
 
@@ -35,11 +37,33 @@ func challenging(userEntity repository.UserDetails) func(ctx *gin.Context) {
 			ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"err": err.Error()})
 			return
 		}
-		challenger, code, err := userEntity.Challenging(cRequest)
+
+		challengeDetails, code, err := usersEntity.Challenging(cRequest)
+
 		//history, code, err := userEntity.History(cRequest)
-		//fmt.Printf("%+v\n", challenger)
+		fmt.Printf("%+v\n", challengeDetails)
 		response := map[string]interface{}{
-			"data": challenger,
+			"data": challengeDetails,
+			//"error": err.Error(),
+		}
+		ctx.JSON(code, response)
+
+	}
+}*/
+
+func UpdateStatusUser(userEntity repository.UserDetails) func(ctx *gin.Context) {
+	return func(ctx *gin.Context) {
+		var userRequest form.Users
+		err := ctx.BindJSON(&userRequest)
+		if err != nil {
+			ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"err": err.Error()})
+			return
+		}
+		user, code, err := userEntity.UpdateStatus(userRequest)
+		response := map[string]interface{}{
+			"username": user.Username,
+			"status":   user.Status_user,
+			"message":  "Successfully updated status",
 			//"error":    err.Error(),
 		}
 		ctx.JSON(code, response)

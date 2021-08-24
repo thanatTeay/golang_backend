@@ -23,7 +23,9 @@ type usersEntity struct {
 
 type UserDetails interface {
 	//History(challengeForm form.Challenge) (*models.Users, int, error)
-	Challenging(challengeForm form.Challenge) (*models.Challenge, int, error)
+	//Challenging(challengeForm form.Challenge) (*models.Challenge, int, error)
+	UpdateStatus(userForm form.Users) (*models.Users, int, error)
+	UpdateScore(rankForm form.Ranking) (*models.Users, int, error)
 	Register(userForm form.Users) (*models.Users, int, error)
 	GetUserByID(username string) (*models.Users, int, error)
 	OnlineUsers() ([]models.Users, int, error)
@@ -37,135 +39,76 @@ func NewUserEntity(resource *db.Resource) UserDetails {
 	return UserEntity
 }
 
-func (entity *usersEntity) Challenging(challengeForm form.Challenge) (*models.Challenge, int, error) {
+func (entity *usersEntity) UpdateScore(rankForm form.Ranking) (*models.Users, int, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
-	//fmt.Printf("%+s\n", userForm.Username)
-	foundUser1, _, _ := entity.GetUserByID(challengeForm.Username)
-	if foundUser1 == nil {
-		return nil, http.StatusBadRequest, errors.New("Not found Username")
+
+	var user_total_win = 0
+	var user_total_lose = 0
+	var challenger_total_win = 0
+	var challenger_total_lose = 0
+
+	found1, _, _ := entity.GetUserByID(rankForm.User)
+	found2, _, _ := entity.GetUserByID(rankForm.Challenger)
+	//fmt.Printf("Username for getID: %+s\n", user.Username)
+	if found1 == nil {
+		return nil, http.StatusBadRequest, errors.New("User not found")
 	}
-	foundUser2, _, _ := entity.GetUserByID(challengeForm.Challenger)
-	if foundUser2 == nil {
-		return nil, http.StatusBadRequest, errors.New("Not found Username")
+	if found2 == nil {
+		return nil, http.StatusBadRequest, errors.New("Challenger not found")
 	}
-	var user1_win = 0
-	var user1_lose = 0
-	var user2_win = 0
-	var user2_lose = 0
+	user_total_win = found1.Total_win
+	challenger_total_lose = found2.Total_lose
+	challenger_total_win = found2.Total_win
+	user_total_lose = found1.Total_lose
 
-	// Rock
-	if challengeForm.Action_user == "Rock" && challengeForm.Action_challenger == "Paper" {
-		user1_lose = foundUser1.Total_lose
-		user1_lose++
-
-	} else if challengeForm.Action_user == "Rock" && challengeForm.Action_challenger == "Scissors" {
-		user1_win = foundUser1.Total_lose
-		user1_win++
-	} else if challengeForm.Action_user == "Rock" && challengeForm.Action_challenger == "Rock" {
-
-	} else if challengeForm.Action_challenger == "Rock" && challengeForm.Action_user == "Paper" {
-		user2_lose = foundUser2.Total_lose
-		user2_lose++
-	} else if challengeForm.Action_challenger == "Rock" && challengeForm.Action_user == "Scissors" {
-		user2_win = foundUser2.Total_win
-		user2_win++
+	userScore := models.Users{
+		//Users1: models.Users(challengeForm.User1),
+		//Users2: models.Users(challengeForm.User2),
 	}
-	// end Rock
+	//log.Fatal(found)
+	if rankForm.Winner == 1 {
 
-	// Paper
-	if challengeForm.Action_user == "Paper" && challengeForm.Action_challenger == "Rock" {
-		user1_win = foundUser1.Total_lose
-		user1_win++
-	} else if challengeForm.Action_user == "Paper" && challengeForm.Action_challenger == "Scissors" {
-		user1_lose = foundUser1.Total_lose
-		user1_lose++
+		user_total_win++
 
-	} else if challengeForm.Action_user == "Paper" && challengeForm.Action_challenger == "Paper" {
+		challenger_total_lose++
 
-	} else if challengeForm.Action_challenger == "Paper" && challengeForm.Action_user == "Rock" {
-		user2_win = foundUser2.Total_win
-		user2_win++
-	} else if challengeForm.Action_challenger == "Paper" && challengeForm.Action_user == "Scissors" {
-		user2_lose = foundUser2.Total_lose
-		user2_lose++
+	} else {
 
+		challenger_total_win++
+
+		user_total_lose++
 	}
 
-	// end Paper
-
-	// Scissors
-	if challengeForm.Action_user == "Scissors" && challengeForm.Action_challenger == "Rock" {
-		user1_lose = foundUser1.Total_lose
-		user1_lose++
-	} else if challengeForm.Action_user == "Scissors" && challengeForm.Action_challenger == "Paper" {
-		user1_win = foundUser1.Total_lose
-		user1_win++
-	} else if challengeForm.Action_user == "Scissors" && challengeForm.Action_challenger == "Scissors" {
-
-	} else if challengeForm.Action_challenger == "Scissors" && challengeForm.Action_user == "Rock" {
-		user2_lose = foundUser2.Total_lose
-		user2_lose++
-
-	} else if challengeForm.Action_challenger == "Scissors" && challengeForm.Action_user == "Paper" {
-		user2_win = foundUser2.Total_win
-		user2_win++
+	_, err := entity.repo.UpdateOne(ctx, bson.M{"username": rankForm.User}, bson.M{"$set": bson.M{"total_win": user_total_win, "total_lose": user_total_lose}})
+	_, err2 := entity.repo.UpdateOne(ctx, bson.M{"username": rankForm.Challenger}, bson.M{"$set": bson.M{"total_win": challenger_total_win, "total_lose": challenger_total_lose}})
+	if err != nil {
+		logrus.Print(err)
+		return nil, 400, err
 	}
-
-	// end Scissors
-
-	user1 := models.Users{
-		Username:    foundUser1.Username,
-		Online:      foundUser1.Online,
-		Status_user: "challenging",
-		Total_win:   user1_win,
-		Total_lose:  user1_lose,
+	if err2 != nil {
+		logrus.Print(err2)
+		return nil, 400, err
 	}
+	return &userScore, http.StatusOK, nil
+}
 
-	user2 := models.Users{
-		Username:    foundUser2.Username,
-		Online:      foundUser2.Online,
-		Status_user: "being challenged",
-		Total_win:   user2_win,
-		Total_lose:  user2_lose,
+func (entity *usersEntity) UpdateStatus(userForm form.Users) (*models.Users, int, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+
+	userStatus := models.Users{
+		Username:    userForm.Username,
+		Status_user: userForm.Status_user,
 	}
-
-	challenger := models.Challenge{
-		Id:     challengeForm.Username + "and" + challengeForm.Challenger,
-		Users1: user1,
-		Users2: user2,
-
-		Action_user1: challengeForm.Action_user,
-		Action_user2: challengeForm.Action_challenger,
-	}
-
-	/*history := models.History{
-		Date:              time.Time{},
-		Win:               "",
-		Lose:              "",
-		Action_user:       challengeForm.Action_user,
-		Action_challenger: challengeForm.Action_challenger,
-	}*/
-
-	_, err := entity.repo.UpdateOne(ctx, bson.M{"username": foundUser1.Username}, bson.M{"$set": bson.M{"status_user": user1.Status_user, "total_win": user1.Total_win, "total_lose": user1.Total_lose}})
-	_, err2 := entity.repo.UpdateOne(ctx, bson.M{"username": foundUser2.Username}, bson.M{"$set": bson.M{"status_user": user2.Status_user, "total_win": user2.Total_win, "total_lose": user2.Total_lose}})
-	_, err3 := entity.repo.InsertOne(ctx, challenger)
-
+	_, err := entity.repo.UpdateOne(ctx, bson.M{"username": userStatus.Username}, bson.M{"$set": bson.M{"status_user": userStatus.Status_user}})
 	if err != nil {
 		logrus.Print(err)
 		return nil, 400, err
 	}
 
-	if err2 != nil {
-		logrus.Print(err2)
-		return nil, 400, err2
-	}
-	if err3 != nil {
-		logrus.Print(err3)
-		return nil, 400, err3
-	}
+	return &userStatus, http.StatusOK, nil
 
-	return &challenger, http.StatusOK, nil
 }
 
 func (entity *usersEntity) OnlineUsers() ([]models.Users, int, error) {
@@ -212,6 +155,8 @@ func (entity *usersEntity) Register(userForm form.Users) (*models.Users, int, er
 		Username:    userForm.Username,
 		Status_user: "neutral",
 		Online:      false,
+		Total_win:   0,
+		Total_lose:  0,
 	}
 
 	//log.Fatal(userForm.Username)

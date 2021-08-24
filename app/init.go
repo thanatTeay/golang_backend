@@ -20,6 +20,7 @@ func (app Routes) StartMain() {
 		logrus.Error(err)
 	}
 	api.ApplyUserAPI(usersGroup, resource)
+	api.ApplyChallengeAPI(usersGroup, resource)
 
 	router.Run(":8080")
 }
