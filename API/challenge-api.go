@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"golangBackend/db"
 	"golangBackend/form"
+	"golangBackend/models"
 	"golangBackend/repository"
 	"net/http"
 
@@ -15,6 +16,45 @@ func ApplyChallengeAPI(app *gin.RouterGroup, resource *db.Resource) {
 	userEn := repository.NewUserEntity(resource)
 	authRouteChallenge := app.Group("/challenge")
 	authRouteChallenge.POST("/fighting", Challenge(challengeEntity, userEn))
+	authRouteChallenge.POST("/status", StatusChallenger(challengeEntity, userEn))
+}
+
+func StatusChallenger(challengeEntity repository.ChallengeDetails, userEn repository.UserDetails) func(ctx *gin.Context) {
+	return func(ctx *gin.Context) {
+		var cRequest form.Challenge
+		err := ctx.BindJSON(&cRequest)
+		if err != nil {
+			ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"err": err.Error()})
+			return
+		}
+
+		challengeDetails, code, err := challengeEntity.GetChallengeByID(cRequest.Username, cRequest.Challenger)
+
+		var user *models.Users
+		var challenger *models.Users
+		if challengeDetails != nil {
+			user, code, err = userEn.GetUserByID(challengeDetails.User)
+			challenger, code, err = userEn.GetUserByID(challengeDetails.Challenger)
+		}
+
+		if challengeDetails == nil || user == nil || challenger == nil {
+
+			response := map[string]interface{}{
+				"err": err.Error(),
+			}
+			ctx.JSON(code, response)
+		} else {
+			response := map[string]interface{}{
+				"data":       challengeDetails,
+				"user":       user,
+				"challenger": challenger,
+				//"score": updateScore,
+				//"error": "err",
+			}
+			ctx.JSON(code, response)
+		}
+
+	}
 }
 
 func Challenge(challengeEntity repository.ChallengeDetails, userEn repository.UserDetails) func(ctx *gin.Context) {
@@ -53,12 +93,17 @@ func Challenge(challengeEntity repository.ChallengeDetails, userEn repository.Us
 		updateScore, code, err := userEn.UpdateScore(RankingRequest)
 		//history, code, err := userEntity.History(cRequest)
 		fmt.Printf("%+v\n", updateScore)
-		response := map[string]interface{}{
-			"data": challengeDetails,
-			//"score": updateScore,
-			//"error": "err",
+		if challengeDetails == nil || updateScore == nil {
+			response := map[string]interface{}{
+				"err": err.Error(),
+			}
+			ctx.JSON(code, response)
+		} else {
+			response := map[string]interface{}{
+				"data": challengeDetails,
+			}
+			ctx.JSON(code, response)
 		}
-		ctx.JSON(code, response)
 
 	}
 }

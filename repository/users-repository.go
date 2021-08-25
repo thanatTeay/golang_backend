@@ -12,6 +12,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 var UserEntity UserDetails
@@ -30,6 +31,7 @@ type UserDetails interface {
 	GetUserByID(username string) (*models.Users, int, error)
 	OnlineUsers() ([]models.Users, int, error)
 	GetAll() ([]models.Users, int, error)
+	Ranking() ([]models.Users, int, error)
 }
 
 func NewUserEntity(resource *db.Resource) UserDetails {
@@ -37,6 +39,32 @@ func NewUserEntity(resource *db.Resource) UserDetails {
 	UserEntity = &usersEntity{resource: resource, repo: userRepo}
 
 	return UserEntity
+}
+
+func (entity *usersEntity) Ranking() ([]models.Users, int, error) {
+	//usersList := []models.Users{}
+	usersList := []models.Users{}
+	findOptions := options.Find()
+	findOptions.SetSort(bson.D{{"total_win", -1}})
+
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+	cursor, err := entity.repo.Find(ctx, bson.M{}, findOptions)
+
+	if err != nil {
+		logrus.Print(err)
+		return []models.Users{}, 400, err
+	}
+
+	for cursor.Next(ctx) {
+		var user models.Users
+		err = cursor.Decode(&user)
+		if err != nil {
+			logrus.Print(err)
+		}
+		usersList = append(usersList, user)
+	}
+	return usersList, http.StatusOK, nil
 }
 
 func (entity *usersEntity) UpdateScore(rankForm form.Ranking) (*models.Users, int, error) {

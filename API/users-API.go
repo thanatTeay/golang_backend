@@ -13,43 +13,29 @@ import (
 func ApplyUserAPI(app *gin.RouterGroup, resource *db.Resource) {
 	userEntity := repository.NewUserEntity(resource)
 	authRoute := app.Group("")
-	fmt.Printf("%+v\n", authRoute)
-	//authRoute.POST("/login", login(userEntity))
+
 	authRoute.POST("/signup", signUp(userEntity))
 
-	//fmt.Printf("CheckSignUpReturn:  %+v\n", signUp(userEntity))
 	authRouteUser := app.Group("/users")
 	authRouteUser.GET("/getall", GetAllUsers(userEntity))
 	authRouteUser.GET("/getonline", GetOnlineUsers(userEntity))
 	authRoute.POST("/updateStatus", UpdateStatusUser(userEntity))
 
-	//authRouteChallenge := app.Group("/challenge")
-	//authRouteChallenge.POST("/fighting", Challenge(userEntity))
+	authRouteRanking := app.Group("/ranking")
+	authRouteRanking.GET("", Ranking(userEntity))
 
 }
 
-/*func Challenge(usersEntity repository.UserDetails) func(ctx *gin.Context) {
+func Ranking(userEntity repository.UserDetails) func(ctx *gin.Context) {
 	return func(ctx *gin.Context) {
-		var cRequest form.Challenge
-
-		err := ctx.BindJSON(&cRequest)
-		if err != nil {
-			ctx.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"err": err.Error()})
-			return
-		}
-
-		challengeDetails, code, err := usersEntity.Challenging(cRequest)
-
-		//history, code, err := userEntity.History(cRequest)
-		fmt.Printf("%+v\n", challengeDetails)
+		list, code, _ := userEntity.Ranking()
 		response := map[string]interface{}{
-			"data": challengeDetails,
-			//"error": err.Error(),
+			"username": list,
+			//"error":    err.Error(),
 		}
 		ctx.JSON(code, response)
-
 	}
-}*/
+}
 
 func UpdateStatusUser(userEntity repository.UserDetails) func(ctx *gin.Context) {
 	return func(ctx *gin.Context) {
@@ -60,13 +46,20 @@ func UpdateStatusUser(userEntity repository.UserDetails) func(ctx *gin.Context) 
 			return
 		}
 		user, code, err := userEntity.UpdateStatus(userRequest)
-		response := map[string]interface{}{
-			"username": user.Username,
-			"status":   user.Status_user,
-			"message":  "Successfully updated status",
-			//"error":    err.Error(),
+
+		if user == nil {
+			response := map[string]interface{}{
+				"err": err.Error(),
+			}
+			ctx.JSON(code, response)
+		} else {
+			response := map[string]interface{}{
+				"username": user.Username,
+				"status":   user.Status_user,
+				"message":  "Successfully updated status",
+			}
+			ctx.JSON(code, response)
 		}
-		ctx.JSON(code, response)
 
 	}
 }
